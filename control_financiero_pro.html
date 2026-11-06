@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinanzasPro - Control Multimoneda Local</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            850: '#151f32',
+                            900: '#0f172a',
+                            950: '#080d1a',
+                        },
+                        teal: {
+                            400: '#2dd4bf',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Estilos personalizados y utilidades de impresión */
+        @media print {
+            body { background: white !important; color: black !important; }
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            .card-print { border: 1px solid #ddd !important; box-shadow: none !important; background: transparent !important; color: black !important; }
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #0d9488;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col antialiased custom-scrollbar">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-30 no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-teal-500/10 p-2.5 rounded-xl border border-teal-500/20 text-teal-400">
+                    <i class="fa-solid font-bold fa-wallet text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-white leading-tight">FinanzasPro <span class="text-xs font-normal text-teal-400 bg-teal-950 border border-teal-800 px-2 py-0.5 rounded-full ml-1">Local & Privado</span></h1>
+                    <p class="text-xs text-slate-400">Control Personal y de Negocio Multimoneda</p>
+                </div>
+            </div>
+            
+            <!-- Quick Actions Bar -->
+            <div class="flex items-center space-x-2 sm:space-x-4">
+                <button onclick="openModal('modal-movimiento')" class="bg-teal-600 hover:bg-teal-500 text-white text-xs sm:text-sm font-semibold px-3 py-2 sm:px-4 sm:py-2 rounded-lg transition-all duration-200 flex items-center gap-2 shadow-lg shadow-teal-900/30">
+                    <i class="fa-solid fa-plus"></i> <span class="hidden sm:inline">Nuevo Movimiento</span>
+                </button>
+
+                <div class="h-6 w-px bg-slate-800"></div>
+
+                <!-- Backup Menu -->
+                <div class="relative group">
+                    <button class="p-2 text-slate-400 hover:text-white bg-slate-850 hover:bg-slate-800 rounded-lg border border-slate-800 transition" title="Copias de Seguridad y Datos">
+                        <i class="fa-solid fa-database text-sm"></i>
+                    </button>
+                    <div class="absolute right-0 mt-2 w-48 bg-slate-900 border border-slate-800 rounded-xl shadow-xl hidden group-hover:block z-50 p-1">
+                        <button onclick="exportDataJSON()" class="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 rounded-lg flex items-center gap-2">
+                            <i class="fa-solid fa-download text-teal-400"></i> Respaldar (JSON)
+                        </button>
+                        <button onclick="document.getElementById('file-input').click()" class="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 rounded-lg flex items-center gap-2">
+                            <i class="fa-solid fa-upload text-blue-400"></i> Restaurar (JSON)
+                        </button>
+                        <button onclick="exportDataCSV()" class="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 rounded-lg flex items-center gap-2">
+                            <i class="fa-solid fa-file-excel text-emerald-400"></i> Exportar a CSV/Excel
+                        </button>
+                        <input type="file" id="file-input" class="hidden" accept=".json" onchange="importDataJSON(event)">
+                    </div>
+                </div>
+
+                <button onclick="window.print()" class="p-2 text-slate-400 hover:text-white bg-slate-850 hover:bg-slate-800 rounded-lg border border-slate-800 transition" title="Imprimir o Exportar PDF">
+                    <i class="fa-solid fa-print text-sm"></i>
+                </button>
+                
+                <button onclick="openModal('modal-config')" class="p-2 text-slate-400 hover:text-white bg-slate-850 hover:bg-slate-800 rounded-lg border border-slate-800 transition" title="Configuración de Categorías">
+                    <i class="fa-solid fa-gear text-sm"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main App Container -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Controls Bar & Filters -->
+        <section class="bg-slate-900 p-4 rounded-2xl border border-slate-800/80 shadow-md flex flex-wrap gap-4 items-center justify-between no-print">
+            <div class="flex flex-wrap items-center gap-3">
+                <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <i class="fa-solid fa-filter text-teal-400"></i> Filtros:
+                </span>
+                
+                <!-- Period Selector -->
+                <select id="filter-mes" onchange="applyFilters()" class="bg-slate-950 border border-slate-800 text-slate-200 text-xs sm:text-sm rounded-lg px-3 py-1.5 focus:border-teal-500 focus:outline-none">
+                    <option value="TODOS">Todos los meses</option>
+                    <option value="01">Enero</option>
+                    <option value="02">Febrero</option>
+                    <option value="03">Marzo</option>
+                    <option value="04">Abril</option>
+                    <option value="05">Mayo</option>
+                    <option value="06">Junio</option>
+                    <option value="07">Julio</option>
+                    <option value="08">Agosto</option>
+                    <option value="09">Septiembre</option>
+                    <option value="10">Octubre</option>
+                    <option value="11">Noviembre</option>
+                    <option value="12">Diciembre</option>
+                </select>
+
+                <select id="filter-anio" onchange="applyFilters()" class="bg-slate-950 border border-slate-800 text-slate-200 text-xs sm:text-sm rounded-lg px-3 py-1.5 focus:border-teal-500 focus:outline-none">
+                    <!-- Dinámico por JS -->
+                </select>
+
+                <select id="filter-categoria" onchange="applyFilters()" class="bg-slate-950 border border-slate-800 text-slate-200 text-xs sm:text-sm rounded-lg px-3 py-1.5 focus:border-teal-500 focus:outline-none max-w-[150px] sm:max-w-none">
+                    <option value="TODOS">Todas las Categorías</option>
+                </select>
+            </div>
+
+            <!-- Global Currency Preferences & TC -->
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
+                    <label for="base-currency" class="text-xs text-slate-400 font-medium">Moneda Visual:</label>
+                    <select id="base-currency" onchange="updateDashboard()" class="bg-transparent text-teal-400 font-bold text-xs sm:text-sm focus:outline-none">
+                        <option value="PEN">PEN (S/)</option>
+                        <option value="USD">USD ($)</option>
+                        <option value="EUR">EUR (€)</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <!-- KPI Cards Grid -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Ingresos -->
+            <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800/80 shadow-lg relative overflow-hidden card-print">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Ingresos</p>
+                        <h3 id="kpi-ingresos" class="text-2xl font-black text-emerald-400 mt-1">S/ 0.00</h3>
+                    </div>
+                    <div class="bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20 text-emerald-400">
+                        <i class="fa-solid fa-arrow-trend-up text-xl"></i>
+                    </div>
+                </div>
+                <div class="mt-2 text-xs text-slate-400 flex items-center gap-1">
+                    <span id="kpi-ingresos-count">0 operaciones</span>
+                </div>
+            </div>
+
+            <!-- Gastos -->
+            <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800/80 shadow-lg relative overflow-hidden card-print">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Gastos</p>
+                        <h3 id="kpi-gastos" class="text-2xl font-black text-rose-400 mt-1">S/ 0.00</h3>
+                    </div>
+                    <div class="bg-rose-500/10 p-3 rounded-xl border border-rose-500/20 text-rose-400">
+                        <i class="fa-solid fa-arrow-trend-down text-xl"></i>
+                    </div>
+                </div>
+                <div class="mt-2 text-xs text-slate-400 flex items-center gap-1">
+                    <span id="kpi-gastos-count">0 operaciones</span>
+                </div>
+            </div>
+
+            <!-- Saldo Neto -->
+            <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800/80 shadow-lg relative overflow-hidden card-print">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Balance / Saldo Neto</p>
+                        <h3 id="kpi-balance" class="text-2xl font-black text-teal-400 mt-1">S/ 0.00</h3>
+                    </div>
+                    <div class="bg-teal-500/10 p-3 rounded-xl border border-teal-500/20 text-teal-400">
+                        <i class="fa-solid fa-scale-balanced text-xl"></i>
+                    </div>
+                </div>
+                <div class="mt-2 text-xs text-slate-400 flex items-center gap-1">
+                    <span id="kpi-margen-text">Margen: 0%</span>
+                </div>
+            </div>
+
+            <!-- Deudas / Pendientes -->
+            <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800/80 shadow-lg relative overflow-hidden card-print">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Cuentas Pendientes</p>
+                        <h3 id="kpi-pendientes" class="text-2xl font-black text-amber-400 mt-1">S/ 0.00</h3>
+                    </div>
+                    <div class="bg-amber-500/10 p-3 rounded-xl border border-amber-500/20 text-amber-400">
+                        <i class="fa-solid fa-clock text-xl"></i>
+                    </div>
+                </div>
+                <div class="mt-2 text-xs text-slate-400 flex items-center gap-1">
+                    <span id="kpi-deudas-sub">Por pagar o cobrar</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Charts Dashboard Section -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Combined Bar Chart: Ingresos vs Gastos -->
+            <div class="lg:col-span-2 bg-slate-900 p-5 rounded-2xl border border-slate-800/80 shadow-lg card-print">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-chart-column text-teal-400"></i> Comportamiento Ingresos vs Gastos
+                    </h3>
+                </div>
+                <div class="relative h-64 sm:h-72 w-full">
+                    <canvas id="chart-barras"></canvas>
+                </div>
+            </div>
+
+            <!-- Donut Chart: Gastos por Categoría -->
+            <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800/80 shadow-lg card-print">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-chart-pie text-teal-400"></i> Distribución de Gastos
+                    </h3>
+                </div>
+                <div class="relative h-64 sm:h-72 w-full flex items-center justify-center">
+                    <canvas id="chart-dona"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- History & Movements Table -->
+        <section class="bg-slate-900 rounded-2xl border border-slate-800/80 shadow-lg overflow-hidden">
+            <div class="p-4 sm:p-5 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h3 class="text-base font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-teal-400"></i> Registro de Movimientos
+                    </h3>
+                    <p class="text-xs text-slate-400">Historial completo con soporte multimoneda y conversión</p>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <div class="relative w-full sm:w-64">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 text-xs"></i>
+                        <input type="text" id="table-search" onkeyup="applyFilters()" placeholder="Buscar concepto, cliente..." class="w-full bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl pl-9 pr-3 py-2 focus:border-teal-500 focus:outline-none">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Responsive Table Container -->
+            <div class="overflow-x-auto custom-scrollbar">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-950/70 border-b border-slate-800 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                            <th class="p-3.5">Fecha</th>
+                            <th class="p-3.5">Tipo</th>
+                            <th class="p-3.5">Categoría</th>
+                            <th class="p-3.5">Descripción / Concepto</th>
+                            <th class="p-3.5 text-right">Monto Orig.</th>
+                            <th class="p-3.5 text-center">T.C.</th>
+                            <th class="p-3.5 text-right">Monto Visual</th>
+                            <th class="p-3.5">Método / Estado</th>
+                            <th class="p-3.5 text-center no-print">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-movimientos-body" class="divide-y divide-slate-800/60 text-xs text-slate-300">
+                        <!-- Data rows dynamically rendered -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="tabla-empty-state" class="hidden p-8 text-center text-slate-500">
+                <i class="fa-solid fa-folder-open text-3xl mb-2 text-slate-600"></i>
+                <p>No se encontraron movimientos con los filtros seleccionados.</p>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal: Nuevo / Editar Movimiento -->
+    <div id="modal-movimiento" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden transform transition-all">
+            <div class="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-850">
+                <h3 id="modal-mov-title" class="font-bold text-base text-white flex items-center gap-2">
+                    <i class="fa-solid fa-circle-plus text-teal-400"></i> Nuevo Movimiento
+                </h3>
+                <button onclick="closeModal('modal-movimiento')" class="text-slate-400 hover:text-white transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form id="form-movimiento" onsubmit="saveMovimiento(event)" class="p-5 space-y-4">
+                <input type="hidden" id="mov-id">
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">Fecha *</label>
+                        <input type="date" id="mov-fecha" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:border-teal-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">Tipo Movimiento *</label>
+                        <select id="mov-tipo" required onchange="updateFormCategorias()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:border-teal-500 focus:outline-none">
+                            <option value="INGRESO">Ingreso (+)</option>
+                            <option value="GASTO">Gasto (-)</option>
+                            <option value="DEUDA">Deuda / Pendiente</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">Categoría *</label>
+                        <select id="mov-categoria" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:border-teal-500 focus:outline-none">
+                            <!-- Categorías por JS -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">Estado *</label>
+                        <select id="mov-estado" required class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:border-teal-500 focus:outline-none">
+                            <option value="PAGADO">Pagado / Cobrado</option>
+                            <option value="PENDIENTE">Pendiente</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Descripción / Cliente / Proyecto *</label>
+                    <input type="text" id="mov-descripcion" required placeholder="Ej. Mantenimiento Web cliente XYZ" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:border-teal-500 focus:outline-none">
+                </div>
+
+                <!-- Multicurrency Inputs -->
+                <div class="grid grid-cols-3 gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800/80">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">Monto Orig. *</label>
+                        <input type="number" step="0.01" id="mov-monto" required placeholder="0.00" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-bold focus:border-teal-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">Moneda *</label>
+                        <select id="mov-moneda" onchange="autoCalculateTC()" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:border-teal-500 focus:outline-none">
+                            <option value="PEN">PEN (S/)</option>
+                            <option value="USD">USD ($)</option>
+                            <option value="EUR">EUR (€)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-400 mb-1">T. Cambio (vs PEN)</label>
+                        <input type="number" step="0.001" id="mov-tc" value="1.000" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:border-teal-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Método de Pago</label>
+                    <select id="mov-metodo" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:border-teal-500 focus:outline-none">
+                        <option value="Transferencia">Transferencia Bancaria</option>
+                        <option value="Tarjeta">Tarjeta de Crédito / Débito</option>
+                        <option value="Efectivo">Efectivo</option>
+                        <option value="PayPal">PayPal / Stripe</option>
+                    </select>
+                </div>
+
+                <div class="pt-3 flex justify-end gap-3 border-t border-slate-800">
+                    <button type="button" onclick="closeModal('modal-movimiento')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold rounded-xl transition shadow-lg shadow-teal-900/40">Guardar Movimiento</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Configuración de Categorías -->
+    <div id="modal-config" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+            <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-850">
+                <h3 class="font-bold text-base text-white flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-teal-400"></i> Personalizar Categorías
+                </h3>
+                <button onclick="closeModal('modal-config')" class="text-slate-400 hover:text-white transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <div class="p-5 space-y-4">
+                <div class="flex gap-2">
+                    <input type="text" id="new-cat-name" placeholder="Nueva categoría..." class="flex-grow bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:border-teal-500 focus:outline-none">
+                    <select id="new-cat-type" class="bg-slate-950 border border-slate-800 text-xs text-slate-200 rounded-xl px-2 focus:outline-none">
+                        <option value="GASTO">Gasto</option>
+                        <option value="INGRESO">Ingreso</option>
+                    </select>
+                    <button onclick="addCustomCategory()" class="bg-teal-600 hover:bg-teal-500 text-white px-3 py-2 rounded-xl text-xs font-semibold transition">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                </div>
+
+                <div class="max-h-60 overflow-y-auto custom-scrollbar space-y-2" id="cat-list-container">
+                    <!-- Dynamic categories list -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Engine JS -->
+    <script>
+        // Default initial data
+        const defaultCategories = [
+            { id: 1, name: 'Sueldos / Honorarios', type: 'GASTO' },
+            { id: 2, name: 'Mantenimientos Web', type: 'INGRESO' },
+            { id: 3, name: 'Licencias & Software', type: 'GASTO' },
+            { id: 4, name: 'Servicios Básicos', type: 'GASTO' },
+            { id: 5, name: 'Ventas Directas', type: 'INGRESO' },
+            { id: 6, name: 'Tarjetas / Deudas', type: 'GASTO' }
+        ];
+
+        const defaultMovements = [
+            { id: 101, fecha: '2026-11-01', tipo: 'INGRESO', categoria: 'Mantenimientos Web', descripcion: 'Mantenimiento cliente E-commerce', monto: 450.00, moneda: 'USD', tc: 3.75, metodo: 'Transferencia', estado: 'PAGADO' },
+            { id: 102, fecha: '2026-11-02', tipo: 'GASTO', categoria: 'Licencias & Software', descripcion: 'Hosting Vultr Server', monto: 35.00, moneda: 'USD', tc: 3.75, metodo: 'Tarjeta', estado: 'PAGADO' },
+            { id: 103, fecha: '2026-11-03', tipo: 'GASTO', categoria: 'Servicios Básicos', descripcion: 'Internet Fibra Óptica', monto: 120.00, moneda: 'PEN', tc: 1.00, metodo: 'Transferencia', estado: 'PAGADO' }
+        ];
+
+        // Global State
+        let categories = JSON.parse(localStorage.getItem('fp_categories')) || defaultCategories;
+        let movements = JSON.parse(localStorage.getItem('fp_movements')) || defaultMovements;
+        let chartBarrasInstance = null;
+        let chartDonaInstance = null;
+
+        // Initialization
+        window.addEventListener('DOMContentLoaded', () => {
+            initYearFilter();
+            populateCategoryDropdowns();
+            renderCategoryConfigList();
+            applyFilters();
+            
+            // Set current date on form
+            document.getElementById('mov-fecha').value = new Date().toISOString().split('T')[0];
+        });
+
+        // Local Storage Helpers
+        function saveState() {
+            localStorage.setItem('fp_categories', JSON.stringify(categories));
+            localStorage.setItem('fp_movements', JSON.stringify(movements));
+        }
+
+        // Modal Helpers
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+            if(id === 'modal-movimiento') {
+                document.getElementById('form-movimiento').reset();
+                document.getElementById('mov-id').value = '';
+                document.getElementById('mov-fecha').value = new Date().toISOString().split('T')[0];
+                document.getElementById('mov-tc').value = '1.000';
+            }
+        }
+
+        // Year Filter Initializer
+        function initYearFilter() {
+            const anioSelect = document.getElementById('filter-anio');
+            const currentYear = new Date().getFullYear();
+            anioSelect.innerHTML = '<option value="TODOS">Todos los años</option>';
+            for(let y = currentYear + 1; y >= currentYear - 3; y--) {
+                const opt = document.createElement('option');
+                opt.value = y;
+                opt.textContent = y;
+                if(y === currentYear) opt.selected = true;
+                anioSelect.appendChild(opt);
+            }
+        }
+
+        // Category Management
+        function populateCategoryDropdowns() {
+            const filterCat = document.getElementById('filter-categoria');
+            const currentFilter = filterCat.value;
+            filterCat.innerHTML = '<option value="TODOS">Todas las Categorías</option>';
+            
+            categories.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.name;
+                opt.textContent = c.name;
+                filterCat.appendChild(opt);
+            });
+            filterCat.value = currentFilter;
+
+            updateFormCategorias();
+        }
+
+        function updateFormCategorias() {
+            const tipo = document.getElementById('mov-tipo').value;
+            const catSelect = document.getElementById('mov-categoria');
+            catSelect.innerHTML = '';
+            
+            const filtered = categories.filter(c => c.type === (tipo === 'DEUDA' ? 'GASTO' : tipo));
+            filtered.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.name;
+                opt.textContent = c.name;
+                catSelect.appendChild(opt);
+            });
+        }
+
+        function renderCategoryConfigList() {
+            const container = document.getElementById('cat-list-container');
+            container.innerHTML = '';
+            categories.forEach((cat, index) => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-xs';
+                item.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 text-[10px] rounded-md font-bold ${cat.type === 'INGRESO' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-800'}">${cat.type}</span>
+                        <span class="text-slate-200">${cat.name}</span>
+                    </div>
+                    <button onclick="removeCategory(${index})" class="text-slate-500 hover:text-rose-400 transition"><i class="fa-solid fa-trash-can"></i></button>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function addCustomCategory() {
+            const nameInput = document.getElementById('new-cat-name');
+            const typeInput = document.getElementById('new-cat-type');
+            const name = nameInput.value.trim();
+            if(!name) return;
+
+            categories.push({ id: Date.now(), name: name, type: typeInput.value });
+            nameInput.value = '';
+            saveState();
+            populateCategoryDropdowns();
+            renderCategoryConfigList();
+        }
+
+        function removeCategory(index) {
+            categories.splice(index, 1);
+            saveState();
+            populateCategoryDropdowns();
+            renderCategoryConfigList();
+        }
+
+        function autoCalculateTC() {
+            const moneda = document.getElementById('mov-moneda').value;
+            const tcInput = document.getElementById('mov-tc');
+            if(moneda === 'PEN') {
+                tcInput.value = '1.000';
+            } else if(moneda === 'USD' && tcInput.value === '1.000') {
+                tcInput.value = '3.750';
+            } else if(moneda === 'EUR' && tcInput.value === '1.000') {
+                tcInput.value = '4.050';
+            }
+        }
+
+        // Filtering Engine
+        function getFilteredMovements() {
+            const fMes = document.getElementById('filter-mes').value;
+            const fAnio = document.getElementById('filter-anio').value;
+            const fCat = document.getElementById('filter-categoria').value;
+            const fSearch = document.getElementById('table-search').value.toLowerCase();
+
+            return movements.filter(m => {
+                const dateObj = new Date(m.fecha + 'T00:00:00');
+                const monthStr = String(dateObj.getMonth() + 1).padStart(2, '0');
+                const yearStr = String(dateObj.getFullYear());
+
+                const matchMes = (fMes === 'TODOS' || monthStr === fMes);
+                const matchAnio = (fAnio === 'TODOS' || yearStr === fAnio);
+                const matchCat = (fCat === 'TODOS' || m.categoria === fCat);
+                const matchSearch = m.descripcion.toLowerCase().includes(fSearch) || m.categoria.toLowerCase().includes(fSearch);
+
+                return matchMes && matchAnio && matchCat && matchSearch;
+            });
+        }
+
+        function applyFilters() {
+            updateDashboard();
+        }
+
+        // Conversion helper
+        function convertCurrency(amount, fromMoneda, toMoneda, tc) {
+            // First convert to base PEN
+            let inPEN = fromMoneda === 'PEN' ? amount : amount * tc;
+            
+            // Then convert to target visual currency (approx exchange rates for viewing)
+            if(toMoneda === 'PEN') return inPEN;
+            if(toMoneda === 'USD') return inPEN / 3.75;
+            if(toMoneda === 'EUR') return inPEN / 4.05;
+            return inPEN;
+        }
+
+        function getCurrencySymbol(moneda) {
+            if(moneda === 'USD') return '$';
+            if(moneda === 'EUR') return '€';
+            return 'S/';
+        }
+
+        // Core Dashboard Render
+        function updateDashboard() {
+            const filtered = getFilteredMovements();
+            const targetCurrency = document.getElementById('base-currency').value;
+            const symbol = getCurrencySymbol(targetCurrency);
+
+            let totalIngresos = 0, countIngresos = 0;
+            let totalGastos = 0, countGastos = 0;
+            let totalPendientes = 0;
+
+            filtered.forEach(m => {
+                const converted = convertCurrency(m.monto, m.moneda, targetCurrency, m.tc);
+                
+                if(m.tipo === 'INGRESO') {
+                    totalIngresos += converted;
+                    countIngresos++;
+                } else if(m.tipo === 'GASTO') {
+                    totalGastos += converted;
+                    countGastos++;
+                }
+                
+                if(m.estado === 'PENDIENTE') {
+                    totalPendientes += converted;
+                }
+            });
+
+            const balance = totalIngresos - totalGastos;
+            const margen = totalIngresos > 0 ? ((balance / totalIngresos) * 100).toFixed(1) : 0;
+
+            // Update KPI Cards
+            document.getElementById('kpi-ingresos').textContent = `${symbol} ${totalIngresos.toLocaleString('es-PE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('kpi-ingresos-count').textContent = `${countIngresos} transacciones`;
+
+            document.getElementById('kpi-gastos').textContent = `${symbol} ${totalGastos.toLocaleString('es-PE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('kpi-gastos-count').textContent = `${countGastos} transacciones`;
+
+            document.getElementById('kpi-balance').textContent = `${symbol} ${balance.toLocaleString('es-PE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('kpi-margen-text').textContent = `Margen Neto: ${margen}%`;
+
+            document.getElementById('kpi-pendientes').textContent = `${symbol} ${totalPendientes.toLocaleString('es-PE', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+            renderTable(filtered, targetCurrency);
+            renderCharts(filtered, targetCurrency);
+        }
+
+        // Render Movements Table
+        function renderTable(data, targetCurrency) {
+            const tbody = document.getElementById('tabla-movimientos-body');
+            const emptyState = document.getElementById('tabla-empty-state');
+            tbody.innerHTML = '';
+
+            if(data.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            emptyState.classList.add('hidden');
+
+            data.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+            data.forEach(m => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-850/60 transition border-b border-slate-800/40';
+
+                const convertedValue = convertCurrency(m.monto, m.moneda, targetCurrency, m.tc);
+                const visualSymbol = getCurrencySymbol(targetCurrency);
+                const origSymbol = getCurrencySymbol(m.moneda);
+
+                tr.innerHTML = `
+                    <td class="p-3.5 text-slate-400 font-mono text-[11px]">${m.fecha}</td>
+                    <td class="p-3.5">
+                        <span class="px-2 py-0.5 text-[10px] rounded-md font-bold ${
+                            m.tipo === 'INGRESO' ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/80' : 
+                            m.tipo === 'GASTO' ? 'bg-rose-950/80 text-rose-400 border border-rose-800/80' : 
+                            'bg-amber-950/80 text-amber-400 border border-amber-800/80'
+                        }">
+                            ${m.tipo}
+                        </span>
+                    </td>
+                    <td class="p-3.5 font-medium text-slate-200">${m.categoria}</td>
+                    <td class="p-3.5 text-slate-300 max-w-xs truncate">${m.descripcion}</td>
+                    <td class="p-3.5 text-right font-mono font-medium text-slate-200">${origSymbol} ${m.monto.toFixed(2)}</td>
+                    <td class="p-3.5 text-center font-mono text-[11px] text-slate-400">${m.tc.toFixed(2)}</td>
+                    <td class="p-3.5 text-right font-mono font-bold ${m.tipo === 'INGRESO' ? 'text-emerald-400' : 'text-rose-400'}">
+                        ${visualSymbol} ${convertedValue.toFixed(2)}
+                    </td>
+                    <td class="p-3.5 text-slate-400 text-[11px]">
+                        <div>${m.metodo}</div>
+                        <span class="text-[10px] ${m.estado === 'PAGADO' ? 'text-teal-400' : 'text-amber-400 font-semibold'}">• ${m.estado}</span>
+                    </td>
+                    <td class="p-3.5 text-center no-print">
+                        <div class="flex items-center justify-center gap-2">
+                            <button onclick="editMovimiento(${m.id})" class="text-slate-400 hover:text-teal-400 transition"><i class="fa-solid fa-pen"></i></button>
+                            <button onclick="deleteMovimiento(${m.id})" class="text-slate-400 hover:text-rose-400 transition"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Render Charts with Chart.js
+        function renderCharts(data, targetCurrency) {
+            const visualSymbol = getCurrencySymbol(targetCurrency);
+
+            // Chart 1: Bar Chart Categorized
+            const catTotals = {};
+            let totalIngresos = 0;
+            let totalGastos = 0;
+
+            data.forEach(m => {
+                const val = convertCurrency(m.monto, m.moneda, targetCurrency, m.tc);
+                if(m.tipo === 'INGRESO') totalIngresos += val;
+                if(m.tipo === 'GASTO') {
+                    totalGastos += val;
+                    catTotals[m.categoria] = (catTotals[m.categoria] || 0) + val;
+                }
+            });
+
+            // Destroy existing charts to prevent rendering glitches
+            if(chartBarrasInstance) chartBarrasInstance.destroy();
+            if(chartDonaInstance) chartDonaInstance.destroy();
+
+            // Bar Chart Config
+            const ctxBarras = document.getElementById('chart-barras').getContext('2d');
+            chartBarrasInstance = new Chart(ctxBarras, {
+                type: 'bar',
+                data: {
+                    labels: ['Ingresos Totales', 'Gastos Totales'],
+                    datasets: [{
+                        label: `Monto en ${targetCurrency}`,
+                        data: [totalIngresos, totalGastos],
+                        backgroundColor: ['rgba(45, 212, 191, 0.8)', 'rgba(251, 113, 133, 0.8)'],
+                        borderColor: ['#2dd4bf', '#fb7185'],
+                        borderWidth: 1.5,
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            grid: { color: 'rgba(51, 65, 85, 0.3)' },
+                            ticks: { color: '#94a3b8', callback: (v) => `${visualSymbol} ${v}` }
+                        },
+                        x: { ticks: { color: '#94a3b8' } }
+                    }
+                }
+            });
+
+            // Donut Chart Config
+            const ctxDona = document.getElementById('chart-dona').getContext('2d');
+            const donutLabels = Object.keys(catTotals);
+            const donutData = Object.values(catTotals);
+
+            chartDonaInstance = new Chart(ctxDona, {
+                type: 'doughnut',
+                data: {
+                    labels: donutLabels.length ? donutLabels : ['Sin Gastos'],
+                    datasets: [{
+                        data: donutData.length ? donutData : [1],
+                        backgroundColor: [
+                            '#2dd4bf', '#38bdf8', '#818cf8', '#c084fc', '#f472b6', '#fb7185', '#fbbf24'
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#0f172a'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        // Save/Edit Movement Form Handler
+        function saveMovimiento(e) {
+            e.preventDefault();
+            const id = document.getElementById('mov-id').value;
+            const newMov = {
+                id: id ? parseInt(id) : Date.now(),
+                fecha: document.getElementById('mov-fecha').value,
+                tipo: document.getElementById('mov-tipo').value,
+                categoria: document.getElementById('mov-categoria').value,
+                descripcion: document.getElementById('mov-descripcion').value,
+                monto: parseFloat(document.getElementById('mov-monto').value),
+                moneda: document.getElementById('mov-moneda').value,
+                tc: parseFloat(document.getElementById('mov-tc').value) || 1.0,
+                metodo: document.getElementById('mov-metodo').value,
+                estado: document.getElementById('mov-estado').value
+            };
+
+            if(id) {
+                const idx = movements.findIndex(m => m.id === parseInt(id));
+                if(idx !== -1) movements[idx] = newMov;
+            } else {
+                movements.push(newMov);
+            }
+
+            saveState();
+            closeModal('modal-movimiento');
+            updateDashboard();
+        }
+
+        function editMovimiento(id) {
+            const m = movements.find(item => item.id === id);
+            if(!m) return;
+
+            document.getElementById('mov-id').value = m.id;
+            document.getElementById('mov-fecha').value = m.fecha;
+            document.getElementById('mov-tipo').value = m.tipo;
+            updateFormCategorias();
+            document.getElementById('mov-categoria').value = m.categoria;
+            document.getElementById('mov-descripcion').value = m.descripcion;
+            document.getElementById('mov-monto').value = m.monto;
+            document.getElementById('mov-moneda').value = m.moneda;
+            document.getElementById('mov-tc').value = m.tc;
+            document.getElementById('mov-metodo').value = m.metodo;
+            document.getElementById('mov-estado').value = m.estado;
+
+            document.getElementById('modal-mov-title').innerHTML = '<i class="fa-solid fa-pen-to-square text-teal-400"></i> Editar Movimiento';
+            openModal('modal-movimiento');
+        }
+
+        function deleteMovimiento(id) {
+            if(confirm('¿Estás seguro de eliminar este registro financiero?')) {
+                movements = movements.filter(m => m.id !== id);
+                saveState();
+                updateDashboard();
+            }
+        }
+
+        // Data Export & Import Handlers
+        function exportDataJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ categories, movements }, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `FinanzasPro_Backup_${new Date().toISOString().split('T')[0]}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        function importDataJSON(event) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    if(parsed.movements && parsed.categories) {
+                        movements = parsed.movements;
+                        categories = parsed.categories;
+                        saveState();
+                        populateCategoryDropdowns();
+                        renderCategoryConfigList();
+                        updateDashboard();
+                        alert('¡Datos e historial restaurados con éxito!');
+                    }
+                } catch(err) {
+                    alert('Error al leer el archivo JSON.');
+                }
+            };
+            reader.readAsText(event.target.files[0]);
+        }
+
+        function exportDataCSV() {
+            let csv = 'ID,Fecha,Tipo,Categoria,Descripcion,MontoOriginal,Moneda,TipoCambio,MetodoPago,Estado\n';
+            movements.forEach(m => {
+                csv += `${m.id},"${m.fecha}","${m.tipo}","${m.categoria}","${m.descripcion}",${m.monto},"${m.moneda}",${m.tc},"${m.metodo}","${m.estado}"\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute('download', `FinanzasPro_Export_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        }
+    </script>
+</body>
+</html>
